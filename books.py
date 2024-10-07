@@ -2,6 +2,7 @@ import csv
 import pandas as pd 
 import os
 import nltk
+import re
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.naive_bayes import MultinomialNB
@@ -33,44 +34,67 @@ some hueristics for idenfiying quotes in the text
 ## - quote
 ## - not quote
 
-def preprocess_vector(text):
-    ## create list of words to ignore such as CHAPTER
-    ignore = ['CHAPTER', 'Chapter', 'chapter']
-    ## returns a vector if it has punctuation or a proper noun
-    has_punctuation = 0
-    has_proper_noun = 0
-    text = nltk.word_tokenize(text)
-    for word in text:
-        if word in ignore:
-            has_proper_noun = 0
-            has_punctuation = 0
-            break 
-        if word in ['.', ',', '?', '!', "'", '"']:
-            has_punctuation = 1
-        if word.istitle():
-            has_proper_noun = 1
-    return [has_punctuation, has_proper_noun]
 
 book_files = os.listdir(books)
 first_book = book_files[0]
 
 
+## read first book csv quotes column as a list
+first_quote_info = pd.read_csv(books + first_book + '/quotation_info.csv')
+
+# extract array from the dataframe under header subQuotationList and convert it to a list of strings
+quotes = first_quote_info['subQuotationList'].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist()
+
+## flatten the list of quotes
+quotes = [item for sublist in quotes for item in sublist]
+
+for x in range(len(quotes)):
+    ## tokenize the quote
+    quotes[x] = nltk.sent_tokenize(quotes[x])
+
+quotes = [item for sublist in quotes for item in sublist]
+
+
+        
+
 ## vector for sentence classification
 x = []
 with open(books + first_book + '/novel_text.txt', 'r') as file:
     text = file.read()
-    ## split the text into sentences
-    sentences = nltk.sent_tokenize(text)
-    for sent in sentences:
-        vect = preprocess_vector(sent)
-        x.append([vect, sent])
+    sentence = nltk.sent_tokenize(text)
+
+    ## mark if the sentence contains a quote
+    for s in sentence:
+        if any(q in s for q in quotes):
+            x.append((s, 'quote'))
+        else:
+            x.append((s, 'not quote'))
 
 
-## read first book csv
-first_quote_info = pd.read_csv(books + first_book + '/quotation_info.csv')
+## create a dataframe from the list of tuples
+df = pd.DataFrame(x, columns=['text', 'label'])
 
-# extract array from the dataframe under header quoteText
-quotes = first_quote_info['quoteText'].values
+##split the data into training and testing sets
+train = df.sample(frac=0.8)
+test = df.drop(train.index)
+
+## use count vectorizer to convert the text into a matrix of token counts
+
+vectorizer = CountVectorizer()
+X_train = vectorizer.fit_transform(train['text'])
+
+## use maximum entropy to classify the quotes
+clf = MultinomialNB()
+clf.fit(X_train, train['label'])
+
+## test the classifier
+X_test = vectorizer.transform(test['text'])
+print(clf.score(X_test, test['label']))
+
+## test the classifier on the first book
+X_first = vectorizer.transform(sentence)
+print(clf.predict(X_first))
+## print the quotes
 
 
 
