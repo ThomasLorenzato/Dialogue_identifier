@@ -1,81 +1,11 @@
-import csv
-import pandas as pd 
-import os
-import nltk
-import re
-
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 import torch
 from transformers import BertTokenizer, BertForSequenceClassification, Trainer, TrainingArguments
 from torch.utils.data import Dataset, DataLoader
 
-corpus = 'project-dialogism-novel-corpus/'
-
-books = corpus + 'data/'
-
-novel_metadata = pd.read_csv(corpus + 'PDNC-Novel-Index.csv')
-author_metadata = pd.read_csv(corpus + 'PDNC-Author-Index.csv')
-
-## seperate the novels into train and test sets into an 80/20 split
-train_novels = novel_metadata.sample(frac=0.8)
-test_novels = novel_metadata.drop(train_novels.index)
-
-'''
-some hueristics for idenfiying quotes in the text
-- quotes are usually enclosed in double quotes
-- quotes are usually followed by a comma
-- quotes are usually followed by a period
-- quotes are usually followed by a question mark
-- quotes are usually followed by an exclamation mark
-- quotes usally have a speaker words such as said or asked or proper nouns
-'''
-
-## use niave bayes to classify the quotes
-## use the following labels
-## - quote
-## - not quote
-
-
-book_files = os.listdir(books)
-first_book = book_files[0]
-
-
-## read first book csv quotes column as a list
-first_quote_info = pd.read_csv(books + first_book + '/quotation_info.csv')
-
-# extract array from the dataframe under header subQuotationList and convert it to a list of strings
-quotes = first_quote_info['subQuotationList'].apply(lambda x: eval(x) if isinstance(x, str) else x).tolist()
-
-## flatten the list of quotes
-quotes = [item for sublist in quotes for item in sublist]
-
-for x in range(len(quotes)):
-    ## tokenize the quote
-    quotes[x] = nltk.sent_tokenize(quotes[x])
-
-quotes = [item for sublist in quotes for item in sublist]
-
-
-        
-
-## vector for sentence classification
 x = []
-with open(books + first_book + '/novel_text.txt', 'r') as file:
-    text = file.read()
-    sentence = nltk.sent_tokenize(text)
-
-    ## mark if the sentence contains a quote
-    for s in sentence:
-        if any(q in s for q in quotes):
-            x.append((s, 'quote'))
-        else:
-            x.append((s, 'not quote'))
-
-
-## create a dataframe from the list of tuples
-
-df = pd.DataFrame(x, columns=['sentence', 'label'])
 
 # Load your dataframe
 df = pd.DataFrame(x, columns=['sentence', 'label'])
@@ -157,4 +87,3 @@ print(results)
 predictions = trainer.predict(test_dataset)
 y_preds = torch.argmax(torch.tensor(predictions.predictions), axis=1)
 print(classification_report(test_labels, y_preds))
-
